@@ -1,92 +1,91 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.112.1/build/three.module.js';
 
+export const quadtree = (function () {
+	const _MIN_NODE_SIZE = 500;
 
-export const quadtree = (function() {
+	class QuadTree {
+		constructor(params) {
+			const b = new THREE.Box2(params.min, params.max);
+			this._root = {
+				bounds: b,
+				children: [],
+				center: b.getCenter(new THREE.Vector2()),
+				size: b.getSize(new THREE.Vector2()),
+			};
+		}
 
-  const _MIN_NODE_SIZE = 500;
+		GetChildren() {
+			const children = [];
+			this._GetChildren(this._root, children);
+			return children;
+		}
 
-  class QuadTree {
-    constructor(params) {
-      const b = new THREE.Box2(params.min, params.max);
-      this._root = {
-        bounds: b,
-        children: [],
-        center: b.getCenter(new THREE.Vector2()),
-        size: b.getSize(new THREE.Vector2()),
-      };
-    }
+		_GetChildren(node, target) {
+			if (node.children.length == 0) {
+				target.push(node);
+				return;
+			}
 
-    GetChildren() {
-      const children = [];
-      this._GetChildren(this._root, children);
-      return children;
-    }
+			for (let c of node.children) {
+				this._GetChildren(c, target);
+			}
+		}
 
-    _GetChildren(node, target) {
-      if (node.children.length == 0) {
-        target.push(node);
-        return;
-      }
+		Insert(pos) {
+			this._Insert(this._root, new THREE.Vector2(pos.x, pos.z));
+		}
 
-      for (let c of node.children) {
-        this._GetChildren(c, target);
-      }
-    }
+		_Insert(child, pos) {
+			const distToChild = this._DistanceToChild(child, pos);
 
-    Insert(pos) {
-      this._Insert(this._root, new THREE.Vector2(pos.x, pos.z));
-    }
+			if (distToChild < child.size.x && child.size.x > _MIN_NODE_SIZE) {
+				child.children = this._CreateChildren(child);
 
-    _Insert(child, pos) {
-      const distToChild = this._DistanceToChild(child, pos);
+				for (let c of child.children) {
+					this._Insert(c, pos);
+				}
+			}
+		}
 
-      if (distToChild < child.size.x && child.size.x > _MIN_NODE_SIZE) {
-        child.children = this._CreateChildren(child);
+		_DistanceToChild(child, pos) {
+			return child.center.distanceTo(pos);
+		}
 
-        for (let c of child.children) {
-          this._Insert(c, pos);
-        }
-      }
-    }
+		_CreateChildren(child) {
+			const midpoint = child.bounds.getCenter(new THREE.Vector2());
 
-    _DistanceToChild(child, pos) {
-      return child.center.distanceTo(pos);
-    }
+			// Bottom left
+			const b1 = new THREE.Box2(child.bounds.min, midpoint);
 
-    _CreateChildren(child) {
-      const midpoint = child.bounds.getCenter(new THREE.Vector2());
+			// Bottom right
+			const b2 = new THREE.Box2(
+				new THREE.Vector2(midpoint.x, child.bounds.min.y),
+				new THREE.Vector2(child.bounds.max.x, midpoint.y),
+			);
 
-      // Bottom left
-      const b1 = new THREE.Box2(child.bounds.min, midpoint);
+			// Top left
+			const b3 = new THREE.Box2(
+				new THREE.Vector2(child.bounds.min.x, midpoint.y),
+				new THREE.Vector2(midpoint.x, child.bounds.max.y),
+			);
 
-      // Bottom right
-      const b2 = new THREE.Box2(
-        new THREE.Vector2(midpoint.x, child.bounds.min.y),
-        new THREE.Vector2(child.bounds.max.x, midpoint.y));
+			// Top right
+			const b4 = new THREE.Box2(midpoint, child.bounds.max);
 
-      // Top left
-      const b3 = new THREE.Box2(
-        new THREE.Vector2(child.bounds.min.x, midpoint.y),
-        new THREE.Vector2(midpoint.x, child.bounds.max.y));
+			const children = [b1, b2, b3, b4].map((b) => {
+				return {
+					bounds: b,
+					children: [],
+					center: b.getCenter(new THREE.Vector2()),
+					size: b.getSize(new THREE.Vector2()),
+				};
+			});
 
-      // Top right
-      const b4 = new THREE.Box2(midpoint, child.bounds.max);
+			return children;
+		}
+	}
 
-      const children = [b1, b2, b3, b4].map(
-          b => {
-            return {
-              bounds: b,
-              children: [],
-              center: b.getCenter(new THREE.Vector2()),
-              size: b.getSize(new THREE.Vector2())
-            };
-          });
-
-      return children;
-    }
-  }
-
-  return {
-    QuadTree: QuadTree
-  }
+	return {
+		QuadTree: QuadTree,
+	};
 })();
